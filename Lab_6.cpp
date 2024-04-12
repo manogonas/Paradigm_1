@@ -112,7 +112,40 @@ struct CopySyntaxTree : Transformer {
 	};
 };
 
+struct FoldConstants : Transformer {
+	Expression* transformNumber(Number const* number) {
+		return new Number(number->value());
+	};
+	Expression* transformBinaryOperation(BinaryOperation const* binop) {
+		Expression* newleft = binop->left()->transform(this);
+		Expression* newright = binop->right()->transform(this);
+		Number* is_left_number = dynamic_cast<Number*>(newleft);
+		Number* is_right_number = dynamic_cast<Number*>(newright);
+		if ((is_left_number) && (is_right_number)) {
+			return new Number((new BinaryOperation(newleft, binop->operation(), newright))->evaluate());
+		}
+		else {
+			return new BinaryOperation(newleft, binop->operation(), newright);
+		};
+	};
+	Expression* transformFunctionCall(FunctionCall const* fcall) {
+		Expression* newarg = fcall->arg()->transform(this);
+		Number* is_arg_number = dynamic_cast<Number*>(newarg);
+		if (is_arg_number) {
+			return new Number((new FunctionCall(fcall->name(), newarg))->evaluate());
+		}
+		else {
+			return new FunctionCall(fcall->name(), newarg);
+		}
+	};
+	Expression* transformVariable(Variable const* var) {
+		return new Variable(var->name());
+	};
+};
+
 int main() {
+	/*
+	//Для 1 (CopySyntaxTree)
 	Number* n32 = new Number(32.0);
 	Number* n16 = new Number(16.0);
 	BinaryOperation* minus = new BinaryOperation(n32, BinaryOperation::MINUS, n16);
@@ -122,4 +155,14 @@ int main() {
 	FunctionCall* callAbs = new FunctionCall("abs", mult);
 	CopySyntaxTree CST;
 	Expression* newExpr = callAbs->transform(&CST);
+	*/
+	Number* n32 = new Number(32.0);
+	Number* n16 = new Number(16.0);
+	BinaryOperation* minus = new BinaryOperation(n32, BinaryOperation::MINUS, n16);
+	FunctionCall* callSqrt = new FunctionCall("sqrt", minus);
+	Variable* var = new Variable("var");
+	BinaryOperation* mult = new BinaryOperation(var, BinaryOperation::MUL, callSqrt);
+	FunctionCall* callAbs = new FunctionCall("abs", mult);
+	FoldConstants FC;
+	Expression* newExpr = callAbs->transform(&FC);
 };
