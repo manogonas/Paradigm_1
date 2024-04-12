@@ -1,6 +1,5 @@
 ﻿#include <iostream>
 #include <cassert>
-using namespace std;
 
 struct Transformer;
 struct Number;
@@ -9,13 +8,13 @@ struct FunctionCall;
 struct Variable;
 
 struct Expression {
-	virtual ~Expression() { }
+	virtual ~Expression() { };
 	virtual double evaluate() const = 0;
 	virtual Expression* transform(Transformer* tr) const = 0;
 };
 
 struct Transformer { //pattern Visitor
-	virtual ~Transformer() { }
+	virtual ~Transformer() { };
 	virtual Expression* transformNumber(Number const*) = 0;
 	virtual Expression* transformBinaryOperation(BinaryOperation const*) = 0;
 	virtual Expression* transformFunctionCall(FunctionCall const*) = 0;
@@ -23,10 +22,11 @@ struct Transformer { //pattern Visitor
 };
 
 struct Number : Expression {
-	Number(double value);
-	double value() const;
-	double evaluate() const;
-	Expression* transform(Transformer* tr) const;
+	Number(double value) : value_(value) {};
+	double value() const { return value_; };
+	double evaluate() const { return value_; };
+	~Number() {};
+	Expression* transform(Transformer* tr) const { return tr->transformNumber(this); };
 	private:
 		double value_;
 };
@@ -38,13 +38,27 @@ struct BinaryOperation : Expression {
 		DIV = '/',
 		MUL = '*'
 	};
-	BinaryOperation(Expression const* left, int op, Expression const* right);
-	~BinaryOperation();
-	double evaluate() const;
-	Expression* transform(Transformer* tr) const;
-	Expression const* left() const;
-	Expression const* right() const;
-	int operation() const;
+	BinaryOperation(Expression const* left, int op, Expression const* right) : left_(left), op_(op), right_(right) {
+		assert(left_ && right_);
+	};
+	~BinaryOperation() {
+		delete left_;
+		delete right_;
+	};
+	Expression const* left() const { return left_; };
+	Expression const* right() const { return right_; };
+	int operation() const { return op_; };
+	double evaluate() const {
+		double left = left_->evaluate();
+		double right = right_->evaluate();
+		switch (op_) {
+		case PLUS: return left + right;
+		case MINUS: return left - right;
+		case DIV: return left / right;
+		case MUL: return left * right;
+		};
+	};
+	Expression* transform(Transformer* tr) const { return tr->transformBinaryOperation(this); };
 	private:
 		Expression const* left_;
 		Expression const* right_;
@@ -52,45 +66,50 @@ struct BinaryOperation : Expression {
 };
 
 struct FunctionCall : Expression {
-	FunctionCall(string const& name, Expression const* arg);
-	~FunctionCall();
-	double evaluate() const;
-	Expression* transform(Transformer* tr) const;
-	string const& name() const;
-	Expression const* arg() const;
+	FunctionCall(std::string const& name, Expression const* arg) : name_(name), arg_(arg) {
+		assert(arg_);
+		assert(name_ == "sqrt" || name_ == "abs");
+	};
+	~FunctionCall() { delete arg_; };
+	double evaluate() const {
+		if (name_ == "sqrt")
+			return sqrt(arg_->evaluate());
+		else return fabs(arg_->evaluate());
+	};
+	Expression* transform(Transformer* tr) const { return tr->transformFunctionCall(this); };
+	std::string const& name() const { return name_; };
+	Expression const* arg() const { return arg_; };
 	private:
-		string const name_;
+		std::string const name_;
 		Expression const* arg_;
 };
 
 struct Variable : Expression {
-	Variable(string const name);
-	string const& name() const;
-	double evaluate() const;
-	Expression* transform(Transformer* tr) const;
+	Variable(std::string const& name) : name_(name) { };
+	std::string const& name() const { return name_; };
+	double evaluate() const { return 0.0; };
+	Expression* transform(Transformer* tr) const { return tr->transformVariable(this); };
 	private:
-		string const name_;
+		std::string const name_;
 };
-
-/**
- * реализуйте все необходимые методы класса
- * вы можете определять любые вспомогательные
- * методы, если хотите
- */
 
 struct CopySyntaxTree : Transformer {
 	Expression* transformNumber(Number const* number) {
-		// ваш код
-	}
+		Expression* newnum = new Number(number->value());
+		return newnum;
+	};
 	Expression* transformBinaryOperation(BinaryOperation const* binop) {
-		// ваш код
-	}
+		Expression* newbinop = new BinaryOperation(binop->left()->transform(this), binop->operation(), binop->right()->transform(this));
+		return newbinop;
+	};
 	Expression* transformFunctionCall(FunctionCall const* fcall) {
-		// ваш код
-	}
+		Expression* newfuncal = new FunctionCall(fcall->name(), fcall->arg()->transform(this));
+		return newfuncal;
+	};
 	Expression* transformVariable(Variable const* var) {
-		// ваш код
-	}
+		Expression* newvar = new Variable(var->name());
+		return newvar;
+	};
 };
 
 int main() {
